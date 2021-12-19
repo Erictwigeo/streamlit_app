@@ -6,6 +6,7 @@ import datetime
 import plotly.express as px
 
 st.title("Incrementality View")
+st.sidebar.write("Insert data on the url below: https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0")
 #gsheet_url = st.secrets["public_url"]
 gsheet_url = "https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0"
 
