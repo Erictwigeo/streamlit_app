@@ -5,10 +5,8 @@ import plotly.graph_objects as go
 import datetime
 import plotly.express as px
 
-st.title("Twigeo Incrementality")
-gsheet_url = "https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0"
-# Updated, when the URL is saved in the settings
-#gsheet_url = st.secrets["https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0"]
+st.title("Incrementality View")
+gsheet_url = st.secrets["public_url"]
 
 conn = connect()
 rows = conn.execute(f'SELECT * FROM "{gsheet_url}"')
