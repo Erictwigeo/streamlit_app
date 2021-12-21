@@ -8,6 +8,7 @@ import plotly.express as px
 st.set_page_config(layout="wide")
 st.title("Twigeo Incrementality")
 st.sidebar.write("Insert data on the url below: https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0")
+#todo: option to switch between google sheet and manual file
 gsheet_url = "https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0"
 #gsheet_url = st.secrets["public_url"]
 
@@ -22,10 +23,11 @@ select_metric = st.sidebar.selectbox("Select Metric", metrics)
 start_date = st.sidebar.date_input('Start Date', df['date'].min())
 end_date = st.sidebar.date_input('End Date', df['date'].max())
 
-check_manual_budget = st.sidebar.checkbox("Insert Manual budget")
-if check_manual_budget:
-    number = st.sidebar.number_input('Insert Manual budget for the test ')
-    st.sidebar.write('Seöected budget:', number)
+with st.sidebar.expander("Advanced Settings"):
+    check_manual_budget = st.checkbox("Insert Manual budget")
+    if check_manual_budget:
+        number = st.number_input('Insert Manual budget for the test ')
+        st.write('Selected budget:', number)
 
 check_run = st.sidebar.button('Run Incrementality Analysis')
 if check_run:
@@ -43,7 +45,12 @@ kpi_pop = (kpi_pop * 100).astype(int)
 incremental_kpi = df_selected[select_metric].sum() - df_before[select_metric].sum()
 incrmemental_cost = round(df_selected['investment'].sum() / df_selected[select_metric].sum(), 2)
 
+#todo: Add manual last-touch input
+
+#todo: add option to customize "control" period/period before
+
 if check_run:
+    #todo: fix graph
     col1, col2, col3, col4 = st.columns(4)
     if check_manual_budget:
         col1.metric("Investment", str(number))
@@ -61,6 +68,7 @@ if check_run:
     st.bar_chart(df_chart)
 
 if check_run:
+    #todo:fix graph
     st.caption("Results compared to period before")
     times = ['Baseline', 'After budget change']
     fig = go.Figure([go.Bar(x=times, y=[df_before[select_metric].sum(), df_selected[select_metric].sum()])])
