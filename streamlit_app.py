@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 
 # Connect to data
 #todo: option to switch between google sheet and manual file
-#gsheet_url = st.secrets["public_url"]
+gsheet_url = st.secrets["public_url"]
 conn = connect()
 rows = conn.execute(f'SELECT * FROM "{gsheet_url}"')
 df = pd.DataFrame(rows)
