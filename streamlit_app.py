@@ -34,11 +34,12 @@ def insert_data(url):
 app_mode = st.sidebar.selectbox("Select step", ["Introduction", "Run Analysis"])
 if app_mode == "Introduction":
     st.sidebar.success('To continue select "Run Analysis".')
-    st.title('Twigeo Incrementality')
-    st.subheader('Intro - This web app help you analyse our marketing by comparing 2 periods of time and calculate the incremental difference in '
-                 'conversions between the periods. Give it a try below!')
-    st.subheader('Step 1 is to select the data you want to analyse, this can be done uploading your own CSV file or'
-                 'inserting the data in a specific Google Sheet')
+    st.title('Twigeo Incrementality Dashboard :bar_chart:')
+    st.subheader('This web app help you analyse our marketing efforts by comparing 2 periods of time and calculate the incremental difference in '
+                 'conversions between the periods.')
+    st.write('This type of incrementality analysis is simple and effective for getting a rough readout on incrementality.'
+             'However, it does not take things like seasonality and external factors into account. For a more exact and scientific approach, Geo Experiments or MMM should be explored. ')
+    st.subheader(':point_left: Give it a try!')
 
 if app_mode == 'Run Analysis':
     df = pd.DataFrame()
