@@ -106,9 +106,7 @@ if app_mode == 'Run Analysis':
                 reported_conversions = st.number_input("Reported Conversions",
                                                        help='Add reported/last-touch converisons to be compared to incremental conversions.')
 
-            check_marginal_incr = st.checkbox("Calculate Marginal incrementality",
-                                              help='Check this box if you want to take the marginal investment into account as well (total investment = spend selected period - spend control period)')
-
+##
         check_run = st.sidebar.button('Run Incrementality Analysis')
         if check_run:
             st.sidebar.write("**Measurment completed**")
@@ -133,10 +131,8 @@ if app_mode == 'Run Analysis':
         kpi_pop = (kpi_pop * 100).astype(int)
         incremental_kpi = df_selected[select_metric].sum() - df_before[select_metric].sum()
 
-        if check_marginal_incr:
-            incremental_cost = round(investment_diff / incremental_kpi, 2)
-        else:
-            incremental_cost = round(df_selected['investment'].sum() / incremental_kpi, 2)
+
+        incremental_cost = round(investment_diff / incremental_kpi, 2)
 
         st.header("Step 2 - Incrementality Analysis")
         if check_run:
@@ -151,10 +147,7 @@ if app_mode == 'Run Analysis':
 
             if check_manual_budget:
                 col1.metric("Investment", str(int(number_sel)))
-                if check_marginal_incr:
-                    incremental_cost = round((number_sel - number_control) / incremental_kpi, 1)
-                else:
-                    incremental_cost = round(number_sel / incremental_kpi, 1)
+                incremental_cost = round((number_sel - number_control) / incremental_kpi, 1)
                 col4.metric("incr CP" + select_metric, "$" + str(int(incremental_cost)))
             else:
                 col1.metric("Investment", str(df_selected['investment'].sum().astype(int)), str(investment_pop) + "% PoP")
