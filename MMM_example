@@ -1,0 +1,116 @@
+import streamlit as st
+import pandas as pd
+from gsheetsdb import connect
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+st.set_page_config(layout="wide")
+pct_incremental = str(10)
+view = st.sidebar.selectbox('Select View', ['Overview', 'Budget Planner'])
+
+d = {'Channel': ['Facebook iOS', 'Facebook Android', 'Apple Search Ads', 'Google Search', 'Youtube', 'Offline'],
+         'investment': ['$500,000', '$500,000', '$200,000', '$100,000', '$400,000', '$600,000'],
+         'Sales (attributed)': [500, 400, 100, 50, 150, 80],
+         'Sales (mmm)': [550, 500, 110, 40, 200, 40],
+         '% incremental Sales': ['110%', '120%', '110%', '80%', '133%', '50%'],
+         'CPA (attributed)': ['$800', '$600', '$400', '$1200', '$300', '$1400'],
+         'CPA (mmm)': ['$400', '$300', '$350', '$1400', '$200', '$2000']}
+df_example = pd.DataFrame(data=d)
+if view == 'Overview':
+    st.sidebar.selectbox('Select Geo', ['All', 'US', 'CA', 'UK'])
+    st.title('MMM Results')
+    st.text('(July 1 - Dec 31 2021)')
+    st.text('')
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Investment", '$3,000,000')
+    col2.metric('Total Sales', '30,000')
+    col3.metric("Paid Sales", "15,000", pct_incremental + "% compared to measured")
+    col4.metric("iCost per Sale", "$200")
+    st.write(" ")
+
+    #todo: Show CPA text + paid vs organic
+    fig = go.Figure()
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    x = ['Jul 21', 'Aug 21', 'Sep 21', 'Oct 21', 'Nov 21', 'Dec 21']
+    y1 = [200, 210, 180, 190, 200, 150]
+    y2 = [3000, 4000, 4500, 3000, 4000, 6000]
+    fig.add_trace(
+        go.Scatter(
+            x=x,
+            y=y1,
+            name='incremental CPA'
+        ), secondary_y=False)
+
+    fig.add_trace(
+        go.Bar(
+            x=x,
+            y=y2,
+            name='Total Sales'
+        ), secondary_y=True)
+    fig.update_yaxes(title_text="<b>Incremental CPA</b>", secondary_y=False)
+    fig.update_yaxes(title_text="<b>Total Sales</b>", secondary_y=True)
+    fig.update_layout(title_text="Total Sales vs Incremental Cost per Sale", title_x=0.5)
+    fig.layout.plot_bgcolor = '#fff'
+    st.plotly_chart(fig, use_container_width=True)
+
+    #todo: create a table with paid results vs last-touch. Maybe add LTV/CAC
+    st.text(" ")
+    st.subheader('Channel performance (MMM vs attributed)')
+    st.table(df_example)
+
+    #todo: line chart incremental vs attributed
+
+
+
+    st.header('Recommendations')
+    col_rec_1, col_rec_2, col_rec_3 = st.columns(3)
+    col_rec_1.subheader('Scale up :rocket:')
+    col_rec_1.text('1. Facebook')
+    col_rec_1.text('2. Apple Search Ads')
+    st.text(' ')
+    col_rec_2.subheader('Scale down :arrow_down:')
+    col_rec_2.text('1. Offline')
+    col_rec_3.subheader('Pause :no_entry_sign:')
+    col_rec_3.text('1. Google Search')
+
+if view == 'Budget Planner':
+    st.title('Budget planner')
+    st.write('Budget planner based on MMM results for the next 30 days that is optimizied to give the best results')
+
+    budget = st.sidebar.number_input('Insert media budget')
+    run_budget = st.sidebar.button('Calculate optimal budget')
+    diff = int(((budget / 700000)-1)*100)
+    diff_sales = diff*1.2
+    if run_budget:
+        #todo: replace with DF
+        st.subheader('Budget Output')
+        col_bu_1, col_bu_2, col_bu_3 = st.columns(3)
+        col_bu_1.metric("Jan Budget", '$' + str(int(budget)))
+        col_bu_2.metric("% budget compared to dec", str(int(diff)) +'%')
+        col_bu_3.metric('% change in est Sales', str(int(diff_sales))+'%')
+        st.write('')
+        df_example['pct_optim'] = [0.25, 0.30, 0.1, 0.05, 0.1, 0.2]
+        df_example['pct_optim_str'] = df_example['pct_optim']*100
+        df_example['new_allocation'] = df_example['pct_optim']*budget
+        fig = go.Figure(data=[go.Table(header=dict(values=['Channel', 'Dec budget', 'Recomended Jan', 'Change (%)']),
+                                       cells=dict(values=[df_example['Channel'], ['$250,000', '$250,000', '$100,000', '$95,000', '$200,000', '$300,000'],
+                                                          df_example['new_allocation'],
+                                                          df_example['pct_optim_str']]))
+                              ])
+        st.plotly_chart(fig, use_container_width=True)
+
+        #todo: show diminishing returns (plotly graph)
+        st.subheader('View Marginal return curves')
+        metric_dimin = st.selectbox('Select Channel', df_example['Channel'])
+
+        import plotly.express as px
+
+        df = px.data.gapminder().query("country=='Canada'")
+        fig = px.line(df, x="year", y="lifeExp", title='Marginal Return curve ' + metric_dimin)
+        fig.update_yaxes(title_text="<b>Sales</b>")
+        fig.update_xaxes(title_text="<b>Investment</b>")
+        st.plotly_chart(fig, use_container_width=True)
+
+
+
+
