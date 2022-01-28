@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 from gsheetsdb import connect
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from datetime import datetime
+from prophet import Prophet
+from prophet.plot import add_changepoints_to_plot
 
 st.set_page_config(layout="wide")
 
@@ -28,9 +32,105 @@ def insert_data(url):
     st.warning('Make sure to inspect the dataset above before moving on')
     return df
 
+
+def plot_lift(df_compare):
+    df_compare['day'] = df_compare.ds.dt.day
+    df_compare['month'] = df_compare.ds.dt.month
+    df_compare = df_compare.set_index('ds')
+    df = df_compare
+    fig = go.Figure([
+        go.Scatter(
+            name='Actual conversions',
+            x=df.index,
+            y=df['y'],
+            mode='lines',
+            line=dict(color='rgb(31, 119, 180)'),
+        ),
+        go.Scatter(
+            name='Expected conversions',
+            x=df.index,
+            y=df['yhat'],
+            mode='lines',
+            line=dict(color='#444'),
+        ),
+        go.Scatter(
+            name='Upper Bound',
+            x=df.index,
+            y=df['yhat_upper'],
+            mode='lines',
+            marker=dict(color="#444"),
+            line=dict(width=0),
+            showlegend=False
+        ),
+        go.Scatter(
+            name='Lower Bound',
+            x=df.index,
+            y=df['yhat_lower'],
+            marker=dict(color="#444"),
+            line=dict(width=0),
+            mode='lines',
+            fillcolor='rgba(68, 68, 68, 0.3)',
+            fill='tonexty',
+            showlegend=False
+        )
+    ])
+    fig.update_layout(
+        yaxis_title='Conversions',
+        hovermode="x"
+    )
+    fig.update_yaxes(showgrid=True, gridwidth=0.1, gridcolor='lightGray')
+    fig.layout.plot_bgcolor = '#fff'
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def calculate_lift_prophet(df, date, metric, test_start, test_end):
+    df = df.rename(columns={date: 'ds', metric: 'y'})
+    df.ds = pd.to_datetime(df.ds)
+    # Adjust timeframes
+    df_test = df[(df.ds >= test_start) & (df.ds <= test_end)]
+    df = df[df.ds < test_start]
+    #todo: plot and add cross-validation
+    m = Prophet()
+    m.fit(df)
+    days = (datetime.strptime(test_end, "%Y-%m-%d") - datetime.strptime(test_start, "%Y-%m-%d")).days
+    future = m.make_future_dataframe(periods=int(days) + 1)
+    forecast = m.predict(future)
+    forecast = forecast[(forecast.ds >= test_start) & (forecast.ds <= test_end)]
+    g1 = m.plot(forecast)
+    #fig = m.plot(forecast)
+    #a = add_changepoints_to_plot(fig.gca(), m, forecast)
+    #a
+    g2 = m.plot_components(forecast)
+    #todo: add cross-validation + new models
+    #df_cv = cross_validation(m, initial='14 days', period='2 days', horizon='14 days')
+    #df_p = performance_metrics(df_cv)
+    #g3 = plot_cross_validation_metric(df_cv, metric='mape')
+    return forecast.merge(df_test, on='ds', how='left')[['ds', 'yhat', 'yhat_lower', 'yhat_upper', 'y']], g1, g2#, g3
+
+
+def get_lift_numbers(df_compare, metric, spend):
+    # Baseline sum
+    base_sum = round(df_compare.yhat.sum(), 0)
+    # Real sum
+    real_sum = round(df_compare.y.sum(), 0)
+    # Metric increase
+    metric_increase = round((df_compare.y.sum() / df_compare.yhat.sum() - 1) * 100, 2)
+
+    # above upper bound
+    above_95 = round(df_compare.y.sum(), 0) - round(df_compare.yhat_upper.sum(), 0)
+    if above_95 > 0:
+        stat_sig = 'YES'
+        sign_level = 95
+    else:
+        stat_sig = 'NO'
+        sign_level = -95
+
+    # Cost per metric
+    cost_per_metric = spend / (df_compare.y.sum() - df_compare.yhat.sum())
+    return base_sum, real_sum, metric_increase, cost_per_metric, stat_sig, sign_level
+
 # Connect to data
 #todo: select what dashboard. Switching between dashbaords
-#todo: option to switch between google sheet and manual file
 app_mode = st.sidebar.selectbox("Select step", ["Introduction", "Run Analysis"])
 if app_mode == "Introduction":
     st.sidebar.success('To continue select "Run Analysis".')
@@ -46,12 +146,6 @@ if app_mode == 'Run Analysis':
     st.header('Step 1 - Insert Data')
     file_type = st.selectbox('Select sheet', ['Select sheet: ', 'Example dataset', 'Google Sheet 1',
                                               'Google Sheet 2', 'Google Sheet 3', 'Google Sheet 4', 'Google Sheet 5'])
-    #todo: implement CSV solution
-    #if file_type == 'CSV':
-    #    csv_file = st.file_uploader("Upload CSV file")
-    #    df = csv_file
-    #    st.text('Select Run the App in the sidebar to start incrementality analysis.')
-    #    st.subheader('Inpect data')
 
     if file_type == 'Example dataset':
         df = insert_data("https://docs.google.com/spreadsheets/d/1ky2lnpZd1dQCRvc0Zvux1wIzkIgB_c2s1qpib0ftYgw/edit#gid=0")
@@ -96,7 +190,7 @@ if app_mode == 'Run Analysis':
                 number_control = st.number_input('Manual budget control period')
                 st.write('Selected budget:', number_control)
 
-            custom_period = st.checkbox("Custom comparison period")
+            custom_period = st.checkbox("Custom comparison period", help='Do not work with Prophet results')
             if custom_period:
                 start_date_comp_custom = st.date_input('Start Date baseline', df['date'].min())
                 end_date_comp_custom = st.date_input('End Date baseline', df['date'].max())
@@ -106,7 +200,7 @@ if app_mode == 'Run Analysis':
                 reported_conversions = st.number_input("Reported Conversions",
                                                        help='Add reported/last-touch converisons to be compared to incremental conversions.')
 
-##
+        prophet_results = st.sidebar.checkbox('Add Prophet results')
         check_run = st.sidebar.button('Run Incrementality Analysis')
         if check_run:
             st.sidebar.write("**Measurment completed**")
@@ -134,15 +228,16 @@ if app_mode == 'Run Analysis':
 
         incremental_cost = round(investment_diff / incremental_kpi, 2)
 
-        st.header("Step 2 - Incrementality Analysis")
+        st.header("Incrementality Analysis")
         if check_run:
-            #todo: fix graph
             if check_reported_conversions:
+                st.subheader('Results')
                 col1, col2, col3, col4, col5 = st.columns(5)
                 incremental_comp = incremental_kpi - reported_conversions
                 pct_incremental = int(((incremental_kpi / reported_conversions)-1)*100)
                 col5.metric("Compared to reported conv.", incremental_comp, str(pct_incremental) + "%")
             else:
+                st.subheader('Results')
                 col1, col2, col3, col4 = st.columns(4)
 
             if check_manual_budget:
@@ -168,6 +263,36 @@ if app_mode == 'Run Analysis':
             fig.update_layout(uniformtext_minsize=20, uniformtext_mode='hide')
             fig.layout.plot_bgcolor = '#fff'
             st.plotly_chart(fig, use_container_width=True)
+
+            if prophet_results:
+                metric = select_metric
+                test_start = str(start_date)
+                test_end = str(end_date)
+                df_output, graph1, graph2 = calculate_lift_prophet(df, 'date', metric, test_start, test_end)
+                spend = investment_diff
+                [control_conv, actual_conv, increase, cost_per_conv, stat_sig, above_95] = get_lift_numbers(df_output, metric, spend)
+                st.subheader('Prophet Results')
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Stat sign", stat_sig, str(above_95) + '% significance')
+                col2.metric('% Lift', str(int(increase)) + '%', str(int(increase)) + '%')
+                col3.metric("incremental " + select_metric, int(actual_conv - control_conv))
+                col4.metric("iCP" + select_metric, "$" + str(round(cost_per_conv, 1)))
+
+                times = ['Control Period', 'Selected Period']
+                comp_col = ['darkred', 'darkgreen']
+                fig = go.Figure([go.Bar(x=times,
+                                        y=[control_conv, actual_conv],
+                                        text=[int(control_conv),
+                                              int(actual_conv)],
+                                        textposition='auto',
+                                        marker_color=comp_col)])
+                fig.update_layout(uniformtext_minsize=20, uniformtext_mode='hide')
+                fig.layout.plot_bgcolor = '#fff'
+                st.plotly_chart(fig, use_container_width=True)
+                plot_lift(df_output)
+                with st.expander('Detailed prophet output:'):
+                    graph1
+                    graph2
 
             fig = go.Figure(data=[go.Bar(
                 x=df_selected['date'],
